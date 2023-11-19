@@ -178,8 +178,8 @@ void deinterleave_adpcm(void* buffer, size_t size) {
         uint8_t r1 = b1 & 0x0F;
         uint8_t r2 = b2 & 0x0F;
 
-        dst[j] = (l1 << 4) | l2;
-        dst[j + hsize] = (r1 << 4) | r2;
+        dst[j] = (l2 << 4) | l1;
+        dst[j + hsize] = (r2 << 4) | r1;
     }
 
     memcpy(buffer, dst, size);
@@ -199,8 +199,8 @@ void interleave_adpcm(void* buffer, size_t size) {
         uint8_t r1 = (r >> 4) & 0x0F;
         uint8_t r2 = r & 0x0F;
 
-        dst[i + 0] = (l1 << 4) | r1;
-        dst[i + 1] = (l2 << 4) | r2;
+        dst[i + 0] = (l2 << 4) | r2;
+        dst[i + 1] = (l1 << 4) | r1;
     }
 
     memcpy(buffer, dst, size);

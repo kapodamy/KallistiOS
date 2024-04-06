@@ -178,7 +178,7 @@ static kbd_keymap_t keymaps[KBD_NUM_KEYMAPS] = {
     },
     {
         /* German/QWERTZ keyboard */
-        /* The hex values in the tables are the ISO-8859-15 represention of the
+        /* The hex values in the tables are the ISO-8859-15 representation of the
            German special chars. */
         {
             /* Base values */
@@ -249,7 +249,7 @@ static kbd_keymap_t keymaps[KBD_NUM_KEYMAPS] = {
     {
         /* ES (Spanish QWERTY) keyboard */
         /* The hex values in the tables are the ISO-8859-15 (Euro revision)
-           represention of the Spanish special chars. */
+           representation of the Spanish special chars. */
         {
             /* Base values */
             /* 0xa1: '¡', 0xba: 'º', 0xb4: '´', 0xe7: 'ç',
@@ -521,7 +521,7 @@ static void kbd_check_poll(maple_frame_t *frm) {
     }
 }
 
-static void kbd_reply(maple_frame_t *frm) {
+static void kbd_reply(maple_state_t *, maple_frame_t *frm) {
     maple_response_t *resp;
     uint32 *respbuf;
     kbd_state_t *state;
@@ -612,10 +612,9 @@ static maple_driver_t kbd_drv = {
 };
 
 /* Add the keyboard to the driver chain */
-int kbd_init(void) {
+void kbd_init(void) {
     if(!kbd_drv.drv_list.le_prev)
-        return maple_driver_reg(&kbd_drv);
-    return -1;
+        maple_driver_reg(&kbd_drv);
 }
 
 void kbd_shutdown(void) {

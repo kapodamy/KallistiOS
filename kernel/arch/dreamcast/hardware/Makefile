@@ -12,8 +12,11 @@ ifneq ($(KOS_SUBARCH), naomi)
 	OBJS += biosfont.o cdrom.o flashrom.o
 endif
 
+# G2
+OBJS += g2dma.o
+
 # Sound
-OBJS += spu.o spudma.o
+OBJS += spu.o
 
 # Bus support
 OBJS += asic.o g2bus.o
@@ -22,7 +25,7 @@ OBJS += asic.o g2bus.o
 OBJS += video.o vblank.o
 
 # CPU-related
-OBJS += sq.o scif.o
+OBJS += sq.o sq_fast_cpy.o scif.o ubc.o
 
 # SPI device support
 OBJS += scif-spi.o sd.o

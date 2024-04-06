@@ -11,9 +11,9 @@
 #include <stdlib.h>
 #include <malloc.h>
 
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h>
+#include <KGL/gl.h>
+#include <KGL/glu.h>
+#include <KGL/glut.h>
 
 #include <kos/init.h>
 #include <dc/maple.h>
@@ -103,9 +103,6 @@ static int check_start(void) {
 
     return 0;
 }
-
-extern uint8 romdisk[];
-KOS_INIT_ROMDISK(romdisk);
 
 int main(int argc, char **argv) {
     /* Notice we do not init the PVR here, that is handled by Open GL */

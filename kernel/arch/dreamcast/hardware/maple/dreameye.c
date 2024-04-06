@@ -19,7 +19,7 @@ static int dreameye_send_get_image(maple_device_t *dev,
 
 static dreameye_state_t *first_state = NULL;
 
-static void dreameye_get_image_count_cb(maple_frame_t *frame) {
+static void dreameye_get_image_count_cb(maple_state_t *, maple_frame_t *frame) {
     dreameye_state_t *de;
     maple_response_t *resp;
     uint32 *respbuf32;
@@ -59,7 +59,7 @@ static void dreameye_get_image_count_cb(maple_frame_t *frame) {
     genwait_wake_all(frame);
 }
 
-static void dreameye_get_transfer_count_cb(maple_frame_t *frame) {
+static void dreameye_get_transfer_count_cb(maple_state_t *, maple_frame_t *frame) {
     dreameye_state_t *de;
     maple_response_t *resp;
     uint32 *respbuf32;
@@ -139,7 +139,7 @@ int dreameye_get_image_count(maple_device_t *dev, int block) {
     return MAPLE_EOK;
 }
 
-static void dreameye_get_image_cb(maple_frame_t *frame) {
+static void dreameye_get_image_cb(maple_state_t *, maple_frame_t *frame) {
     maple_device_t *dev;
     maple_response_t *resp;
     uint32 *respbuf32;
@@ -327,7 +327,7 @@ fail:
     return MAPLE_EFAIL;
 }
 
-static void dreameye_erase_cb(maple_frame_t *frame) {
+static void dreameye_erase_cb(maple_state_t *, maple_frame_t *frame) {
     maple_response_t *resp;
     uint8 *respbuf;
 
@@ -430,10 +430,9 @@ static maple_driver_t dreameye_drv = {
 };
 
 /* Add the Dreameye to the driver chain */
-int dreameye_init(void) {
+void dreameye_init(void) {
     if(!dreameye_drv.drv_list.le_prev)
-        return maple_driver_reg(&dreameye_drv);
-    return -1;
+        maple_driver_reg(&dreameye_drv);
 }
 
 void dreameye_shutdown(void) {

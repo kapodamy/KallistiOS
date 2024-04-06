@@ -8,13 +8,17 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <kos/dbgio.h>
+#include <kos/init.h>
 #include <arch/arch.h>
 #include <arch/irq.h>
 #include <arch/memory.h>
 #include <arch/rtc.h>
 #include <arch/timer.h>
+#include <arch/wdt.h>
+#include <dc/perfctr.h>
 #include <dc/ubc.h>
 #include <dc/pvr.h>
 #include <dc/vmufs.h>
@@ -46,16 +50,11 @@ uint32 _fs_dclsocket_get_ip(void);
 
 /* We have to put this here so we can include plat-specific devices */
 dbgio_handler_t * dbgio_handlers[] = {
-#ifndef _arch_sub_naomi
     &dbgio_dcload,
     &dbgio_dcls,
     &dbgio_scif,
     &dbgio_null,
     &dbgio_fb
-#else
-    &dbgio_null,
-    &dbgio_fb
-#endif
 };
 int dbgio_handler_cnt = sizeof(dbgio_handlers) / sizeof(dbgio_handler_t *);
 
@@ -86,28 +85,54 @@ void arch_init_net(void) {
     }
 }
 
-void (*init_net_weak)(void) __attribute__((weak));
-void (*net_shutdown_weak)(void) __attribute__((weak));
+void vmu_fs_init(void) {
+    fs_vmu_init();
+    vmufs_init();
+}
+
+void vmu_fs_shutdown(void) {
+    fs_vmu_shutdown();
+    vmufs_shutdown();
+}
+
+/* Mount the built-in romdisk to /rd. */
+void fs_romdisk_mount_builtin(void) {
+    fs_romdisk_mount("/rd", __kos_romdisk, 0);
+}
+
+void fs_romdisk_mount_builtin_legacy(void) {
+    fs_romdisk_mount_builtin();
+}
+
+KOS_INIT_FLAG_WEAK(arch_init_net, false);
+KOS_INIT_FLAG_WEAK(net_shutdown, false);
+KOS_INIT_FLAG_WEAK(maple_wait_scan, true);
+KOS_INIT_FLAG_WEAK(fs_romdisk_init, true);
+KOS_INIT_FLAG_WEAK(fs_romdisk_shutdown, true);
+KOS_INIT_FLAG_WEAK(fs_romdisk_mount_builtin, false);
+KOS_INIT_FLAG_WEAK(fs_romdisk_mount_builtin_legacy, false);
+KOS_INIT_FLAG_WEAK(vmu_fs_init, true);
+KOS_INIT_FLAG_WEAK(vmu_fs_shutdown, true);
 
 /* Auto-init stuff: override with a non-weak symbol if you don't want all of
    this to be linked into your code (and do the same with the
    arch_auto_shutdown function too). */
-int  __attribute__((weak)) arch_auto_init(void) {
+int  __weak arch_auto_init(void) {
     /* Initialize memory management */
     mm_init();
 
     /* Do this immediately so we can receive exceptions for init code
        and use ints for dbgio receive. */
     irq_init();         /* IRQs */
-    irq_disable();          /* Turn on exceptions */
+    irq_disable();      /* Turn on exceptions */
 
-#ifndef _arch_sub_naomi
+    ubc_init();
+
     if(!(__kos_init_flags & INIT_NO_DCLOAD))
         fs_dcload_init_console();   /* Init dc-load console, if applicable */
 
     /* Init SCIF for debug stuff (maybe) */
     scif_init();
-#endif
 
     /* Init debug IO */
     dbgio_init();
@@ -125,14 +150,9 @@ int  __attribute__((weak)) arch_auto_init(void) {
     hardware_sys_init();        /* DC low-level hardware init */
 
     /* Initialize our timer */
-    timer_ns_enable();
+    perf_cntr_timer_enable();
     timer_ms_enable();
     rtc_init();
-
-    /* Threads */
-    if(!(__kos_init_flags & INIT_THD_PREEMPT))
-        dbglog(DBG_WARNING, "Cooperative threading mode is deprecated. KOS is \
-        always in pre-emptive threading mode. \n");
 
     thd_init();
 
@@ -141,7 +161,7 @@ int  __attribute__((weak)) arch_auto_init(void) {
     fs_init();          /* VFS */
     fs_pty_init();          /* Pty */
     fs_ramdisk_init();      /* Ramdisk */
-    fs_romdisk_init();      /* Romdisk */
+    KOS_INIT_FLAG_CALL(fs_romdisk_init);    /* Romdisk */
 
 /* The arc4random_buf() function used for random & urandom is only
    available in newlib starting with version 2.4.0 */
@@ -153,20 +173,19 @@ int  __attribute__((weak)) arch_auto_init(void) {
 
     hardware_periph_init();     /* DC peripheral init */
 
-    if(__kos_romdisk != NULL) {
-        fs_romdisk_mount("/rd", __kos_romdisk, 0);
-    }
+    if(!KOS_INIT_FLAG_CALL(fs_romdisk_mount_builtin))
+        KOS_INIT_FLAG_CALL(fs_romdisk_mount_builtin_legacy);
 
-#ifndef _arch_sub_naomi
     if(!(__kos_init_flags & INIT_NO_DCLOAD) && *DCLOADMAGICADDR == DCLOADMAGICVALUE) {
         dbglog(DBG_INFO, "dc-load console support enabled\n");
         fs_dcload_init();
     }
 
+#ifndef _arch_sub_naomi
     fs_iso9660_init();
 #endif
-    vmufs_init();
-    fs_vmu_init();
+
+    KOS_INIT_FLAG_CALL(vmu_fs_init);
 
     /* Initialize library handling */
     library_init();
@@ -174,22 +193,20 @@ int  __attribute__((weak)) arch_auto_init(void) {
     /* Now comes the optional stuff */
     if(__kos_init_flags & INIT_IRQ) {
         irq_enable();       /* Turn on IRQs */
-        maple_wait_scan();  /* Wait for the maple scan to complete */
+        KOS_INIT_FLAG_CALL(maple_wait_scan);  /* Wait for the maple scan to complete */
     }
 
 #ifndef _arch_sub_naomi
-    if(init_net_weak)
-        (*init_net_weak)();
+    KOS_INIT_FLAG_CALL(arch_init_net);
 #endif
 
     return 0;
 }
 
-void  __attribute__((weak)) arch_auto_shutdown(void) {
-#ifndef _arch_sub_naomi
+void  __weak arch_auto_shutdown(void) {
     fs_dclsocket_shutdown();
-    if(net_shutdown_weak)
-        (*net_shutdown_weak)();
+#ifndef _arch_sub_naomi
+    KOS_INIT_FLAG_CALL(net_shutdown);
 #endif
 
     irq_disable();
@@ -198,11 +215,8 @@ void  __attribute__((weak)) arch_auto_shutdown(void) {
     hardware_shutdown();
     pvr_shutdown();
     library_shutdown();
-#ifndef _arch_sub_naomi
     fs_dcload_shutdown();
-#endif
-    fs_vmu_shutdown();
-    vmufs_shutdown();
+    KOS_INIT_FLAG_CALL(vmu_fs_shutdown);
 #ifndef _arch_sub_naomi
     fs_iso9660_shutdown();
 #endif
@@ -210,7 +224,7 @@ void  __attribute__((weak)) arch_auto_shutdown(void) {
     fs_dev_shutdown();
 #endif
     fs_ramdisk_shutdown();
-    fs_romdisk_shutdown();
+    KOS_INIT_FLAG_CALL(fs_romdisk_shutdown);
     fs_pty_shutdown();
     fs_shutdown();
     thd_shutdown();
@@ -231,8 +245,11 @@ void arch_main(void) {
     *DMAOR = 0x8201;
 #endif /* _arch_sub_naomi */
 
+    /* Ensure the WDT is not enabled from a previous session */
+    wdt_disable();
+
     /* Ensure that UBC is not enabled from a previous session */
-    ubc_disable_all();
+    ubc_shutdown();
 
     /* Handle optional callback provided by KOS_INIT_EARLY() */
     if(__kos_init_early_fn)
@@ -245,6 +262,8 @@ void arch_main(void) {
     arch_auto_init();
 
     __verify_newlib_patch();
+
+    dbglog(DBG_INFO, "\n");
 
     /* Run ctors */
     _init();
@@ -270,8 +289,11 @@ void arch_shutdown(void) {
 
     dbglog(DBG_CRITICAL, "arch: shutting down kernel\n");
 
+    /* Disable the WDT, if active */
+    wdt_disable();
+
     /* Turn off UBC breakpoints, if any */
-    ubc_disable_all();
+    ubc_shutdown();
 
     /* Do auto-shutdown... or use the "light weight" version underneath */
 #if 1
@@ -306,7 +328,7 @@ void arch_exit(void) {
 
 /* Return point from newlib's _exit() (configurable) */
 void arch_exit_handler(int ret_code) {
-    dbglog(DBG_INFO, "arch: exit return code %d\n", ret_code);
+    dbglog(DBG_INFO, "\narch: exit return code %d\n", ret_code);
 
     /* Shut down */
     arch_shutdown();
@@ -347,8 +369,11 @@ void arch_menu(void) {
 /* Called to shut down non-gracefully; assume the system is in peril
    and don't try to call the dtors */
 void arch_abort(void) {
+    /* Disable the WDT, if active */
+    wdt_disable();
+
     /* Turn off UBC breakpoints, if any */
-    ubc_disable_all();
+    ubc_shutdown();
 
     dbglog(DBG_CRITICAL, "arch: aborting the system\n");
 

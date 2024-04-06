@@ -139,7 +139,7 @@
 
     Responses can be run-length encoded to save space.  A '*' means that
     the next character is an ASCII encoding giving a repeat count which
-    stands for that many repititions of the character preceding the '*'.
+    stands for that many repetitions of the character preceding the '*'.
     The encoding is n+29, yielding a printable character where n >=3
     (which is where rle starts to win).  Don't use an n > 126.
 
@@ -810,7 +810,7 @@ static void gdb_handle_exception(int exceptionVector) {
                 stepping = 1;
                 __fallthrough;
             case 'c': {
-                /* tRY, to read optional parameter, pc unchanged if no parm */
+                /* tRY, to read optional parameter, pc unchanged if no param */
                 if(hexToInt(&ptr, &addr))
                     registers[PC] = addr;
 
@@ -912,18 +912,20 @@ static void flushDebugChannel(void) {
     }
 }
 
-static void handle_exception(irq_t code, irq_context_t *context) {
+static void handle_exception(irq_t code, irq_context_t *context, void *data) {
+    (void)data;
     registers = (uint32 *)context;
     gdb_handle_exception(code);
 }
 
-static void handle_user_trapa(irq_t code, irq_context_t *context) {
+static void handle_user_trapa(irq_t code, irq_context_t *context, void *data) {
     (void)code;
+    (void)data;
     registers = (uint32 *)context;
     gdb_handle_exception(EXC_TRAPA);
 }
 
-static void handle_gdb_trapa(irq_t code, irq_context_t *context) {
+static void handle_gdb_trapa(irq_t code, irq_context_t *context, void *data) {
     /*
     * trapa 0x20 indicates a software trap inserted in
     * place of code ... so back up PC by one
@@ -931,6 +933,7 @@ static void handle_gdb_trapa(irq_t code, irq_context_t *context) {
     * later be replaced by its original one!
     */
     (void)code;
+    (void)data;
     registers = (uint32 *)context;
     registers[PC] -= 2;
     gdb_handle_exception(EXC_TRAPA);
@@ -942,14 +945,14 @@ void gdb_init(void) {
     else
         scif_set_parameters(57600, 1);
 
-    irq_set_handler(EXC_ILLEGAL_INSTR, handle_exception);
-    irq_set_handler(EXC_SLOT_ILLEGAL_INSTR, handle_exception);
-    irq_set_handler(EXC_DATA_ADDRESS_READ, handle_exception);
-    irq_set_handler(EXC_DATA_ADDRESS_WRITE, handle_exception);
-    irq_set_handler(EXC_USER_BREAK_PRE, handle_exception);
+    irq_set_handler(EXC_ILLEGAL_INSTR, handle_exception, NULL);
+    irq_set_handler(EXC_SLOT_ILLEGAL_INSTR, handle_exception, NULL);
+    irq_set_handler(EXC_DATA_ADDRESS_READ, handle_exception, NULL);
+    irq_set_handler(EXC_DATA_ADDRESS_WRITE, handle_exception, NULL);
+    irq_set_handler(EXC_USER_BREAK_PRE, handle_exception, NULL);
 
-    trapa_set_handler(32, handle_gdb_trapa);
-    trapa_set_handler(255, handle_user_trapa);
+    trapa_set_handler(32, handle_gdb_trapa, NULL);
+    trapa_set_handler(255, handle_user_trapa, NULL);
 
     BREAKPOINT();
 }

@@ -513,7 +513,7 @@ int irq_init(void);
 void irq_shutdown(void);
 
 static inline void __irq_scoped_cleanup(int *state) {
-    irq_restore(*state);
+    irq_restore((irq_mask_t)*state);
 }
 
 #define ___irq_disable_scoped(l) \

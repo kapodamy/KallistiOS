@@ -572,7 +572,11 @@ static fquad_t *create_downscaled_map(int res, fquad_t *oneup) {
     fquad_t *q, *larger, tmp;
 
     if(use_debug) {
+#if __UINTPTR_MAX__ == __UINT64_MAX__
         printf("create_downscaled_map(%d %lx)\n", res, (uintptr_t)oneup);
+#else
+        printf("create_downscaled_map(%d %x)\n", res, (uintptr_t)oneup);
+#endif
     }
 
     /* each quad in the lower resolution is an average of
